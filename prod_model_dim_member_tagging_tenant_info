@@ -43,9 +43,9 @@ WHERE STD_MEMBER_MAPPING_TYP IN
 'NET_INCOME', 
 'REVENUE', 
 'OPERATING_EXPENSES', 
-'YEAR_2021', 
 'YEAR_2022', 
 'YEAR_2023', 
+'YEAR_2024', 
 'FULL_YEAR', 
 'JANUARY', 
 'FEBRUARY', 
@@ -287,16 +287,14 @@ left join model_join on model_join.data_cntr_cd = A.data_cntr_cd and model_join.
 inner join tenants on A.tenant_id = tenants.tenant_id
 WHERE STD_MEMBER_MAPPING_TYP IN 
 (
-'OPERATING_EXPENSES',
-'NET_INCOME',
+'ALL_ENTITIES',
+'ALL_DEPARTMENTS',
 'REVENUE',
-'COGS',
+'OPERATING_EXPENSES',
+'COST_OF_GOODS_SOLD',
 'ASSETS',
 'LIABILITIES',
 'EQUITY',
-'ALL_ENTITIES',
-'UNDEFINED ',
-'ALL_DEPARTMENTS',
 'JANUARY',
 'FEBRUARY',
 'MARCH',
@@ -413,9 +411,11 @@ no_packages,
 no_members,
 no_member_types_identified,
 total_children_count,
+
 --labels
 case 
-when ((max(members_satisfied_vcp) = 21) or (max(members_satisfied_insights) = 28) or (max(members_satisfied_tstudio) =25)) then 'At least one model tagged for major feature'
+when ((max(members_satisfied_vcp) = 21) and (max(members_satisfied_insights) = 23) and (max(members_satisfied_tstudio) =25)) then 'Model tagging complete for all major features'
+when ((max(members_satisfied_vcp) = 21) or (max(members_satisfied_insights) = 23) or (max(members_satisfied_tstudio) =25)) then 'At least one model tagged for major feature'
 when (max(members_satisfied_fx) = 10) then 'only FX tags complete for a model'
 else 'not a single model finished tagging' 
 end as Tagging_completed,
@@ -447,9 +447,15 @@ max(members_satisfied_tstudio)/25 as percent_of_tstudio_std_members_exist,
 
 --aggregate earliest tagging date
 case  
-when ((max(members_satisfied_vcp) = 21) or (max(members_satisfied_insights) = 28) or (max(members_satisfied_tstudio) =25))
+when ((max(members_satisfied_vcp) = 21) or (max(members_satisfied_insights) = 23) or (max(members_satisfied_tstudio) =25))
 then least(vcp_completion_date, insights_completion_date,tstudio_completion_date ) else null 
-end as completed_any_major_tagging_on
+end as completed_atleast_one_major_tagging_on,
+
+--aggregate earliest tagging date all customers
+case  
+when ((max(members_satisfied_vcp) = 21) and (max(members_satisfied_insights) = 23) and (max(members_satisfied_tstudio) =25))
+then least(vcp_completion_date, insights_completion_date,tstudio_completion_date ) else null 
+end as completed_all_major_tagging_on
 
 from tenants
 left join projects on tenants.account_id = left(projects.account_id,15)
