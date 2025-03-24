@@ -1,0 +1,28 @@
+WITH TENANT_INFO AS 
+(
+select
+tenant_id,
+account_id,
+tenant_nm,
+data_cntr_cd
+from PROD_HARMONIZED.PRODUCT.TENANT_PROF
+where CRNT_RCRD_IND = 'Y'
+and tenant_enbld_status_nm = 'ENABLED'
+and tenant_typ_nm = 'PRODUCTION'
+)
+
+
+select distinct
+data_center,
+A.tenant_id,
+concat(file_id,',') as file_id,
+tenant_nm,
+solution_package_name,
+solution_package_template_name,
+solution_package_template_version,
+etl_load_date
+from PROD_RAW.MT_SERVER.MTSERVER_TEMPLATE_METRICS_STAGING A
+inner join tenant_info on tenant_info.tenant_id = A.tenant_id and tenant_info.data_cntr_cd = A.data_center
+--where solution_package_name ilike '%studio%'
+where solution_package_template_name ilike 'template studio%'
+and solution_package_template_name <> 'Template Studio Report'
