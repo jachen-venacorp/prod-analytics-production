@@ -1,0 +1,33 @@
+WITH TENANT_INFO AS 
+(
+select
+tenant_id,
+account_id,
+tenant_nm,
+data_cntr_cd
+from PROD_HARMONIZED.PRODUCT.TENANT_PROF
+where CRNT_RCRD_IND = 'Y'
+and tenant_enbld_status_nm = 'ENABLED'
+and tenant_typ_nm = 'PRODUCTION'
+)
+
+
+select distinct
+data_center,
+A.tenant_id,
+tenant_nm,
+sum(case when solution_package_template_name = 'Template Studio OPEX' then 1 else 0 end) as opex_templ_saved,
+sum(case when solution_package_template_name = 'Template Studio Revenue' then 1 else 0 end) as revenue_templ_saved,
+sum(case when solution_package_template_name = 'Template Studio Income Statement' then 1 else 0 end) as IS_templ_saved,
+sum(case when solution_package_template_name = 'Template Studio Custom Report' then 1 else 0 end) as custom_report_templ_saved,
+sum(case when solution_package_template_name = 'Template Studio Custom Input Template' then 1 else 0 end) as custom_input_templ_saved,
+sum(case when solution_package_template_name = 'Template Studio Balance Sheet' then 1 else 0 end) as BS_templ_saved
+from PROD_RAW.MT_SERVER.MTSERVER_TEMPLATE_METRICS_STAGING A
+inner join tenant_info on tenant_info.tenant_id = A.tenant_id and tenant_info.data_cntr_cd = A.data_center
+--where solution_package_name ilike '%studio%'
+where solution_package_template_name ilike 'template studio%'
+and solution_package_template_name <> 'Template Studio Report'
+group by 
+data_center,
+A.tenant_id,
+tenant_nm
