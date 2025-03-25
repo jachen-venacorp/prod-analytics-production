@@ -1,0 +1,72 @@
+WITH PROD_TENANT_INFO AS
+(
+select
+data_cntr_cd,
+tenant_id,
+account_id 
+from PROD_HARMONIZED.PRODUCT.TENANT_PROF
+where CRNT_RCRD_IND = 'Y'
+and tenant_typ_nm = 'PRODUCTION'
+and organization_typ_nm = 'CUSTOMER'
+and tenant_enbld_status_nm = 'ENABLED'
+),
+
+user_info as 
+(
+select distinct
+tenant_dc,
+user_id,
+case when 
+-- vena internal user using their own login for customer tenant
+((login_email ilike '%vena%' or ntfctn_email ilike '%vena%') 
+-- admin@customername logins used by vena employees through SSO
+or (last_impersonation_login_dt is not null and admin_access_ind = 'Y' and built_in_admin_accnt = 'Y'))
+then 'Y' else null end as consultant_login,
+case
+when admin_access_ind = 'Y' or mdlr_access_ind = 'Y' or mngr_access_ind = 'Y' then 'power user'
+when (admin_access_ind = 'N' and mdlr_access_ind = 'N' and mngr_access_ind = 'N' and cntrbtr_access_ind = 'Y') then 'business user'
+end as user_type
+from PROD_HARMONIZED.PRODUCT.VW_USER_PROF_EML_INCLD
+where crnt_rcrd_ind = 'Y'
+),
+
+maxdate as
+(
+select 
+id, 
+max(last_updated_at) as maxdate
+from PROD_RAW.PENDO.FEATURE_HISTORY
+group by id
+),
+
+feature_hist as 
+(
+select 
+history.id as feature_id,
+page_id,
+is_core_event,
+history.name as feature_name,
+to_date(last_updated_at)
+from PROD_RAW.PENDO.FEATURE_HISTORY history
+inner join maxdate on history.id = maxdate.id and history.last_updated_at = maxdate.maxdate
+where current_date()>=to_date(valid_through)
+)
+
+select 
+events.account_id as dc_tenant_id,
+prod_tenant_info.account_id,
+RIGHT(visitor_id,CHARINDEX('.',REVERSE(visitor_id)) - 1) as user_id,
+user_type,
+consultant_login,
+case when visitor_id ilike '%support%' then 'Vena Employee' else null end as pendo_support_indicator,
+num_events,
+num_minutes,
+events.feature_id,
+feature_name,
+_fivetran_synced
+from PROD_RAW.PENDO.FEATURE_EVENT events 
+inner join prod_tenant_info on concat(prod_tenant_info.data_cntr_cd, '.', prod_tenant_info.tenant_id) = events.account_id 
+left join feature_hist on events.feature_id = feature_hist.feature_id
+left join user_info on concat(user_info.tenant_dc,'.',user_info.user_id) = visitor_id
+where 
+(feature_name ilike '%template studio%' or feature_name ilike 'Manager Tab > Process > Files Library > Create New%')
