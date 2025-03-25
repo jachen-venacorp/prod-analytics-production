@@ -469,6 +469,7 @@ left join fx_date on tenants.data_cntr_cd = fx_date.data_cntr_cd and tenants.ten
 left join fx_count on tenants.data_cntr_cd = fx_count.data_cntr_cd and tenants.tenant_id = fx_count.tenant_id
 left join tstudio_date on tenants.data_cntr_cd = tstudio_date.data_cntr_cd and tenants.tenant_id = tstudio_date.tenant_id
 left join tstudio_count on tenants.data_cntr_cd = tstudio_count.data_cntr_cd and tenants.tenant_id = tstudio_count.tenant_id
+where (tenants.tenant_id <> '1497761032260681728' and tenants.data_cntr_cd = 'us5')
 group by 
 tenants.data_cntr_cd,
 tenants.tenant_id,
