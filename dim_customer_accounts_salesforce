@@ -1,0 +1,40 @@
+with acc as 
+(
+select 
+account_id,
+became_customer_dt,
+indstry_nm,
+territory_sgmnt_nm,
+renewal_dt
+from PROD_HARMONIZED.SALES.VW_ACCOUNT_PROF
+where crnt_rcrd_ind = 'Y'
+)
+
+select 
+tenants.account_id as account_id_long,
+left(tenants.account_id,15) as account_id_short,
+account_nm,
+arr_usd,
+admin_license_sold,
+business_license_sold,
+any_combination_license_sold,
+view_only_license_sold,
+total_license_sold,
+became_customer_dt,
+indstry_nm,
+territory_sgmnt_nm,
+renewal_dt,
+/*
+zoom_indstry_nm,
+zoom_prmry_indstry_nm,
+zoom_prmry_sub_indstry_nm,
+zoom_employee_count,
+zoom_revenue,
+powerbi_embedded_ind,
+churn_rsk_ind
+*/
+from PROD_HARMONIZED.PRODUCT.VW_ENBLD_PRODUCTION_TENANTS tenants 
+inner join acc on tenants.account_id = acc.account_id
+where account_typ_nm = 'Customer'
+and tenant_typ_nm = 'PRODUCTION'
+and tenant_enbld_status_nm = 'ENABLED'
