@@ -5,7 +5,15 @@ account_id,
 became_customer_dt,
 indstry_nm,
 territory_sgmnt_nm,
-renewal_dt
+renewal_dt,
+zoom_indstry_nm,
+zoom_prmry_indstry_nm,
+zoom_prmry_sub_indstry_nm,
+zoom_employee_count,
+zoom_revenue,
+powerbi_embedded_ind,
+churn_rsk_ind,
+website_url
 from PROD_HARMONIZED.SALES.VW_ACCOUNT_PROF
 where crnt_rcrd_ind = 'Y'
 )
@@ -24,17 +32,16 @@ became_customer_dt,
 indstry_nm,
 territory_sgmnt_nm,
 renewal_dt,
-/*
 zoom_indstry_nm,
 zoom_prmry_indstry_nm,
 zoom_prmry_sub_indstry_nm,
 zoom_employee_count,
 zoom_revenue,
 powerbi_embedded_ind,
-churn_rsk_ind
-*/
+churn_rsk_ind,
+website_url
 from PROD_HARMONIZED.PRODUCT.VW_ENBLD_PRODUCTION_TENANTS tenants 
-inner join acc on tenants.account_id = acc.account_id
-where account_typ_nm = 'Customer'
+left join acc on tenants.account_id = acc.account_id
+where tenants.account_typ_nm = 'Customer'
 and tenant_typ_nm = 'PRODUCTION'
 and tenant_enbld_status_nm = 'ENABLED'
