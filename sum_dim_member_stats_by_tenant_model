@@ -1,0 +1,85 @@
+WITH PROD_TENANT_INFO AS
+(
+select
+tenant_id,
+tenant_nm,
+data_cntr_cd
+from PROD_HARMONIZED.PRODUCT.TENANT_PROF
+where CRNT_RCRD_IND = 'Y'
+and tenant_enbld_status_nm = 'ENABLED'
+and tenant_typ_nm in ('PRODUCTION')
+),
+
+
+model_dim as 
+(
+SELECT distinct
+  data_cntr_cd, 
+  TENANT_ID, 
+  MODEL_ID, 
+  DIM_ID 
+FROM PROD_HARMONIZED.PRODUCT.MODEL_DIM_DTL  
+),
+
+maxrev as 
+(
+    SELECT
+        data_center,
+        tenant_id,
+        dimension_id,
+        member_id,
+        MAX(rev) AS max_rev
+    FROM "PROD_RAW"."MT_SERVER"."MTSERVER_MEMBERS_STAGING"
+    WHERE etl_load_date >= '2023-12-09'
+    GROUP BY data_center, tenant_id, dimension_id, member_id
+),
+
+member as 
+(
+    SELECT 
+        m.data_center,
+        m.tenant_id,
+        m.dimension_id,
+        m.member_id
+    FROM "PROD_RAW"."MT_SERVER"."MTSERVER_MEMBERS_STAGING" m
+    INNER JOIN maxrev lm
+        ON m.data_center = lm.data_center
+        AND m.tenant_id = lm.tenant_id
+        AND m.dimension_id = lm.dimension_id
+        AND m.member_id = lm.member_id
+        AND m.rev = lm.max_rev
+    WHERE m.etl_load_date >= '2023-12-09'
+      AND m.delete_date_time IS NULL
+),
+
+
+
+cnt as 
+(
+select 
+model_dim.data_cntr_cd,
+model_dim.tenant_id,
+model_id,
+count(distinct member_id) as member_cnt_per_model
+from model_dim 
+left join member 
+on model_dim.data_cntr_cd = member.data_center
+and model_dim.tenant_id = member.tenant_id 
+and model_dim.dim_id = member.dimension_id 
+group by 
+model_dim.data_cntr_cd,
+model_dim.tenant_id,
+model_id
+)
+
+select 
+cnt.data_cntr_cd,
+cnt.tenant_id,
+model_Id,
+max(member_cnt_per_model) as member_cnt_largest_model
+from cnt 
+inner join prod_tenant_info on prod_tenant_info.data_cntr_cd = cnt.data_cntr_cd and prod_tenant_info.tenant_id = cnt.tenant_id 
+group by 
+cnt.data_cntr_cd,
+cnt.tenant_id,
+model_id
