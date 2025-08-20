@@ -1,0 +1,97 @@
+WITH PROD_TENANT_INFO AS
+(
+select
+tenant_id,
+tenant_nm,
+account_id,
+data_cntr_cd
+from PROD_HARMONIZED.PRODUCT.TENANT_PROF
+where CRNT_RCRD_IND = 'Y'
+and tenant_typ_nm in ('PRODUCTION')
+and organization_typ_nm = 'CUSTOMER'
+and tenant_enbld_status_nm = 'ENABLED'
+),
+
+base_followup as 
+(
+select 
+api.data_cntr_cd,
+api.tenant_id,
+api.user_id,
+request_end_dts
+from PROD_HARMONIZED.PRODUCT.USER_API_ACTIVITY api
+inner join prod_tenant_info on prod_tenant_info.tenant_id = api.tenant_id and prod_tenant_info.data_cntr_cd = api.data_cntr_cd
+where 
+to_date(request_end_dts) > ' 2024-02-01'
+--general prompts
+and (request_endpoint_nm ilike '%api/ai/topics/{p}/conversations/{p}/chat/%')
+--reporting agent
+and user_imprsntd_ind = 'N'
+and request_status_cd = '200'
+),
+
+followup_detail as 
+(
+select 
+data_cntr_cd,
+tenant_id,
+user_id,
+request_end_dts,
+DATEDIFF(minute, LAG(request_end_dts) OVER (PARTITION BY data_cntr_cd, tenant_id, user_id ORDER BY request_end_dts), request_end_dts) AS gap_minutes
+from base_followup  
+--where tenant_id = '1253871137249689600'
+--and user_id = '1268743228356820992'
+),
+
+followup_count as 
+(
+select 
+data_cntr_cd,
+tenant_id,
+user_id,
+count(*) as follow_up_prompts
+from followup_detail
+where gap_minutes <= 1
+group by 
+data_cntr_cd,
+tenant_id,
+user_id
+), 
+
+aggregates as 
+(
+select 
+api.data_cntr_cd,
+api.tenant_id,
+count(request_end_dts) as total_prompts_in_chat,
+sum(case when user_agent not ilike '%teams%' then 1 else 0 end) as questions_submitted_web,
+sum(case when user_agent ilike '%teams%' then 1 else 0 end) as questions_submitted_teams
+from PROD_HARMONIZED.PRODUCT.USER_API_ACTIVITY api
+where request_endpoint_nm ilike '%api/ai/topics/{p}/conversations/{p}/chat/%'
+and to_date(request_end_dts) > ' 2024-02-01'
+and request_status_cd = '200'
+and user_imprsntd_ind = 'N' 
+group by 
+api.data_cntr_cd,
+api.tenant_id
+)
+
+select
+prod_tenant_info.data_cntr_cd,
+prod_tenant_info.tenant_id,
+concat(prod_tenant_info.data_cntr_cd,'.',prod_tenant_info.tenant_id) as dc_tenant_id, 
+tenant_nm,
+account_id,
+total_prompts_in_chat,
+sum(follow_up_prompts) as total_prompts_within_followup_window_1m,
+sum(follow_up_prompts)/total_prompts_in_chat as follow_up_pct
+from prod_tenant_info
+left join followup_count on followup_count.data_cntr_cd = prod_tenant_info.data_cntr_cd and followup_count.tenant_id = prod_tenant_info.tenant_id 
+left join aggregates on aggregates.data_cntr_cd = prod_tenant_info.data_cntr_cd and aggregates.tenant_id = prod_tenant_info.tenant_id
+group by 
+prod_tenant_info.data_cntr_cd,
+prod_tenant_info.tenant_id,
+concat(prod_tenant_info.data_cntr_cd,'.',prod_tenant_info.tenant_id), 
+tenant_nm,
+account_id,
+total_prompts_in_chat
